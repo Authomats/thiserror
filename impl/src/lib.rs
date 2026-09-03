@@ -27,6 +27,7 @@ mod fallback;
 mod fmt;
 mod generics;
 mod prop;
+mod root_path;
 mod scan_expr;
 mod unraw;
 mod valid;

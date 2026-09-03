@@ -29,6 +29,7 @@ fn try_expand(input: &DeriveInput) -> Result<TokenStream> {
 }
 
 fn impl_struct(input: Struct) -> TokenStream {
+    let root_path = crate::root_path::root_path();
     let ty = call_site_ident(&input.ident);
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
     let mut error_inferred_bounds = InferredBounds::new();
@@ -36,17 +37,17 @@ fn impl_struct(input: Struct) -> TokenStream {
     let source_body = if let Some(transparent_attr) = &input.attrs.transparent {
         let only_field = &input.fields[0];
         if only_field.contains_generic {
-            error_inferred_bounds.insert(only_field.ty, quote!(::thiserror::#private::Error));
+            error_inferred_bounds.insert(only_field.ty, quote!(#root_path::#private::Error));
         }
         let member = &only_field.member;
         Some(quote_spanned! {transparent_attr.span=>
-            ::thiserror::#private::Error::source(self.#member.as_dyn_error())
+            #root_path::#private::Error::source(self.#member.as_dyn_error())
         })
     } else if let Some(source_field) = input.source_field() {
         let source = &source_field.member;
         if source_field.contains_generic {
             let ty = unoptional_type(source_field.ty);
-            error_inferred_bounds.insert(ty, quote!(::thiserror::#private::Error + 'static));
+            error_inferred_bounds.insert(ty, quote!(#root_path::#private::Error + 'static));
         }
         let asref = if type_is_option(source_field.ty) {
             Some(quote_spanned!(source.span()=> .as_ref()?))
@@ -64,8 +65,8 @@ fn impl_struct(input: Struct) -> TokenStream {
     };
     let source_method = source_body.map(|body| {
         quote! {
-            fn source(&self) -> ::core::option::Option<&(dyn ::thiserror::#private::Error + 'static)> {
-                use ::thiserror::#private::AsDynError as _;
+            fn source(&self) -> ::core::option::Option<&(dyn #root_path::#private::Error + 'static)> {
+                use #root_path::#private::AsDynError as _;
                 #body
             }
         }
@@ -92,28 +93,28 @@ fn impl_struct(input: Struct) -> TokenStream {
             } else if type_is_option(backtrace_field.ty) {
                 Some(quote! {
                     if let ::core::option::Option::Some(backtrace) = &self.#backtrace {
-                        #request.provide_ref::<::thiserror::#private::Backtrace>(backtrace);
+                        #request.provide_ref::<#root_path::#private::Backtrace>(backtrace);
                     }
                 })
             } else {
                 Some(quote! {
-                    #request.provide_ref::<::thiserror::#private::Backtrace>(&self.#backtrace);
+                    #request.provide_ref::<#root_path::#private::Backtrace>(&self.#backtrace);
                 })
             };
             quote! {
-                use ::thiserror::#private::ThiserrorProvide as _;
+                use #root_path::#private::ThiserrorProvide as _;
                 #source_provide
                 #self_provide
             }
         } else if type_is_option(backtrace_field.ty) {
             quote! {
                 if let ::core::option::Option::Some(backtrace) = &self.#backtrace {
-                    #request.provide_ref::<::thiserror::#private::Backtrace>(backtrace);
+                    #request.provide_ref::<#root_path::#private::Backtrace>(backtrace);
                 }
             }
         } else {
             quote! {
-                #request.provide_ref::<::thiserror::#private::Backtrace>(&self.#backtrace);
+                #request.provide_ref::<#root_path::#private::Backtrace>(&self.#backtrace);
             }
         };
         quote! {
@@ -210,7 +211,7 @@ fn impl_struct(input: Struct) -> TokenStream {
     quote! {
         #[allow(unused_qualifications)]
         #[automatically_derived]
-        impl #impl_generics ::thiserror::#private::Error for #ty #ty_generics #error_where_clause {
+        impl #impl_generics #root_path::#private::Error for #ty #ty_generics #error_where_clause {
             #source_method
             #provide_method
         }
@@ -220,6 +221,7 @@ fn impl_struct(input: Struct) -> TokenStream {
 }
 
 fn impl_enum(input: Enum) -> TokenStream {
+    let root_path = crate::root_path::root_path();
     let ty = call_site_ident(&input.ident);
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
     let mut error_inferred_bounds = InferredBounds::new();
@@ -230,11 +232,11 @@ fn impl_enum(input: Enum) -> TokenStream {
             if let Some(transparent_attr) = &variant.attrs.transparent {
                 let only_field = &variant.fields[0];
                 if only_field.contains_generic {
-                    error_inferred_bounds.insert(only_field.ty, quote!(::thiserror::#private::Error));
+                    error_inferred_bounds.insert(only_field.ty, quote!(#root_path::#private::Error));
                 }
                 let member = &only_field.member;
                 let source = quote_spanned! {transparent_attr.span=>
-                    ::thiserror::#private::Error::source(transparent.as_dyn_error())
+                    #root_path::#private::Error::source(transparent.as_dyn_error())
                 };
                 quote! {
                     #ty::#ident {#member: transparent} => #source,
@@ -243,7 +245,7 @@ fn impl_enum(input: Enum) -> TokenStream {
                 let source = &source_field.member;
                 if source_field.contains_generic {
                     let ty = unoptional_type(source_field.ty);
-                    error_inferred_bounds.insert(ty, quote!(::thiserror::#private::Error + 'static));
+                    error_inferred_bounds.insert(ty, quote!(#root_path::#private::Error + 'static));
                 }
                 let asref = if type_is_option(source_field.ty) {
                     Some(quote_spanned!(source.span()=> .as_ref()?))
@@ -264,8 +266,8 @@ fn impl_enum(input: Enum) -> TokenStream {
             }
         });
         Some(quote! {
-            fn source(&self) -> ::core::option::Option<&(dyn ::thiserror::#private::Error + 'static)> {
-                use ::thiserror::#private::AsDynError as _;
+            fn source(&self) -> ::core::option::Option<&(dyn #root_path::#private::Error + 'static)> {
+                use #root_path::#private::AsDynError as _;
                 #[allow(deprecated)]
                 match self {
                     #(#arms)*
@@ -281,9 +283,7 @@ fn impl_enum(input: Enum) -> TokenStream {
         let arms = input.variants.iter().map(|variant| {
             let ident = &variant.ident;
             match (variant.backtrace_field(), variant.source_field()) {
-                (Some(backtrace_field), Some(source_field))
-                    if backtrace_field.attrs.backtrace.is_none() =>
-                {
+                (Some(backtrace_field), Some(source_field)) if backtrace_field.attrs.backtrace.is_none() => {
                     let backtrace = &backtrace_field.member;
                     let source = &source_field.member;
                     let varsource = quote!(source);
@@ -301,12 +301,12 @@ fn impl_enum(input: Enum) -> TokenStream {
                     let self_provide = if type_is_option(backtrace_field.ty) {
                         quote! {
                             if let ::core::option::Option::Some(backtrace) = backtrace {
-                                #request.provide_ref::<::thiserror::#private::Backtrace>(backtrace);
+                                #request.provide_ref::<#root_path::#private::Backtrace>(backtrace);
                             }
                         }
                     } else {
                         quote! {
-                            #request.provide_ref::<::thiserror::#private::Backtrace>(backtrace);
+                            #request.provide_ref::<#root_path::#private::Backtrace>(backtrace);
                         }
                     };
                     quote! {
@@ -315,15 +315,13 @@ fn impl_enum(input: Enum) -> TokenStream {
                             #source: #varsource,
                             ..
                         } => {
-                            use ::thiserror::#private::ThiserrorProvide as _;
+                            use #root_path::#private::ThiserrorProvide as _;
                             #source_provide
                             #self_provide
                         }
                     }
                 }
-                (Some(backtrace_field), Some(source_field))
-                    if backtrace_field.member == source_field.member =>
-                {
+                (Some(backtrace_field), Some(source_field)) if backtrace_field.member == source_field.member => {
                     let backtrace = &backtrace_field.member;
                     let varsource = quote!(source);
                     let source_provide = if type_is_option(source_field.ty) {
@@ -339,7 +337,7 @@ fn impl_enum(input: Enum) -> TokenStream {
                     };
                     quote! {
                         #ty::#ident {#backtrace: #varsource, ..} => {
-                            use ::thiserror::#private::ThiserrorProvide as _;
+                            use #root_path::#private::ThiserrorProvide as _;
                             #source_provide
                         }
                     }
@@ -349,12 +347,12 @@ fn impl_enum(input: Enum) -> TokenStream {
                     let body = if type_is_option(backtrace_field.ty) {
                         quote! {
                             if let ::core::option::Option::Some(backtrace) = backtrace {
-                                #request.provide_ref::<::thiserror::#private::Backtrace>(backtrace);
+                                #request.provide_ref::<#root_path::#private::Backtrace>(backtrace);
                             }
                         }
                     } else {
                         quote! {
-                            #request.provide_ref::<::thiserror::#private::Backtrace>(backtrace);
+                            #request.provide_ref::<#root_path::#private::Backtrace>(backtrace);
                         }
                     };
                     quote! {
@@ -493,7 +491,7 @@ fn impl_enum(input: Enum) -> TokenStream {
     quote! {
         #[allow(unused_qualifications)]
         #[automatically_derived]
-        impl #impl_generics ::thiserror::#private::Error for #ty #ty_generics #error_where_clause {
+        impl #impl_generics #root_path::#private::Error for #ty #ty_generics #error_where_clause {
             #source_method
             #provide_method
         }
@@ -526,20 +524,18 @@ fn fields_pat(fields: &[Field]) -> TokenStream {
 }
 
 fn use_as_display(needs_as_display: bool) -> Option<TokenStream> {
+    let root_path = crate::root_path::root_path();
     if needs_as_display {
         Some(quote! {
-            use ::thiserror::#private::AsDisplay as _;
+            use #root_path::#private::AsDisplay as _;
         })
     } else {
         None
     }
 }
 
-fn from_initializer(
-    from_field: &Field,
-    backtrace_field: Option<&Field>,
-    source_var: &Ident,
-) -> TokenStream {
+fn from_initializer(from_field: &Field, backtrace_field: Option<&Field>, source_var: &Ident) -> TokenStream {
+    let root_path = crate::root_path::root_path();
     let from_member = &from_field.member;
     let some_source = if type_is_option(from_field.ty) {
         quote!(::core::option::Option::Some(#source_var))
@@ -550,11 +546,11 @@ fn from_initializer(
         let backtrace_member = &backtrace_field.member;
         if type_is_option(backtrace_field.ty) {
             quote! {
-                #backtrace_member: ::core::option::Option::Some(::thiserror::#private::Backtrace::capture()),
+                #backtrace_member: ::core::option::Option::Some(#root_path::#private::Backtrace::capture()),
             }
         } else {
             quote! {
-                #backtrace_member: ::core::convert::From::from(::thiserror::#private::Backtrace::capture()),
+                #backtrace_member: ::core::convert::From::from(#root_path::#private::Backtrace::capture()),
             }
         }
     });
