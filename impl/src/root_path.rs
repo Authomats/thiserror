@@ -1,7 +1,7 @@
 pub(crate) fn root_path() -> proc_macro2::TokenStream {
-    // Simply use `thiserror` instead of `thiserror`. `::hicore::thiserror` would be more stable,
-    // but make problems inside `hicore` itself.
+    // Using `::hicore::thiserror` here instead of simply `thiserror` makes the macros unusable inside
+    // `hicore` itself, but un-ambiguous everywhere else.
     quote::quote! {
-        thiserror
+        ::hicore::thiserror
     }
 }
